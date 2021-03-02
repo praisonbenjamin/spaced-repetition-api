@@ -1,7 +1,8 @@
 const express = require('express')
+const bodyParser = express.json()
 const LanguageService = require('./language-service')
 const { requireAuth } = require('../middleware/jwt-auth')
-
+const { display } = require('../utils/LinkedList')
 const languageRouter = express.Router()
 
 languageRouter
@@ -45,14 +46,75 @@ languageRouter
 
 languageRouter
   .get('/head', async (req, res, next) => {
-    // implement me
-    res.send('implement me!')
+    try {
+      const [nextWord] = await LanguageService.getNextWord(
+        req.app.get('db'),
+        req.language.id
+      )
+    res.json({
+      nextWord: nextWord.original,
+      totalScore: req.language.total_score,
+      wordCorrectCount: nextWord.correct_count,
+      wordIncorrectCount: nextWord.incorrect_count    
+    })
+    next()
+  } catch (error) {
+    next(error)
+  }
   })
 
 languageRouter
-  .post('/guess', async (req, res, next) => {
-    // implement me
-    res.send('implement me!')
+  .post('/guess',  bodyParser, async (req, res, next) => {
+    const { guess } = req.body
+    if (!guess) {
+      return res.status(400).send({
+        error: 'Missing \'guess\' in request body'
+      })
+    }
+    let list
+    try {
+      const words = await LanguageService.getLanguageWords(
+        req.app.get('db'),
+        req.language.id
+      )
+      let list = await LanguageService.populateLinkedList(words, req.language)
+      
+      const head = list.head
+
+      let { translation } = head.value
+      let correct = false
+      if (guess === translation) {
+        correct = true
+        head.value.memory_value *= 2
+        head.value.correct_count++
+        req.language.total_score++
+      } else {
+        head.value.memory_value = 1
+        head.value.incorrect_count++
+      }
+      list.remove(head.value)
+      list.insertAt(head.value, head.value.memory_value + 1)
+
+      await LanguageService.updateWords(
+        req.app.get('db'),
+        display(list),
+        req.language.id,
+        req.language.total_score
+      )
+
+      const nextWord = list.head.value
+
+      res.send({
+        isCorrect: correct,
+        nextWord: nextWord.original,
+        totalScore: req.language.total_score,
+        wordCorrectCount: nextWord.correct_count,
+        wordIncorrectCount: nextWord.incorrect_count,
+        answer: translation
+      })
+    } catch(error) {
+      next(error)
+    }
   })
 
 module.exports = languageRouter
