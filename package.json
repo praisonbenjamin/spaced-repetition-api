@@ -1,5 +1,5 @@
 {
-  "name": "express-boilerplate",
+  "name": "spaced-repetition",
   "version": "0.0.1",
   "description": "",
   "main": "src/server.js",
@@ -28,6 +28,9 @@
     "morgan": "^1.9.1",
     "pg": "^7.8.2",
     "postgrator-cli": "^3.2.0"
+  },
+  "engines": {
+    "node": "12.x"
   },
   "devDependencies": {
     "chai": "^4.2.0",
